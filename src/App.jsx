@@ -1,107 +1,94 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 
-// Small utility to get distance between two points
-const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
-
-// Generate random circle centers within a box (overlap allowed for large counts)
 function generateCircles(count, width, height, radius) {
-  const circles = []
+  const arr = []
   for (let i = 0; i < count; i++) {
     const x = radius + Math.random() * (width - 2 * radius)
     const y = radius + Math.random() * (height - 2 * radius)
-    circles.push({ x, y })
+    arr.push({ id: i + 1, x, y })
   }
-  return circles
+  return arr
+}
+
+function getNextId(items, fadingMap) {
+  const alive = items.filter((c) => !fadingMap[c.id])
+  if (alive.length === 0) return null
+  let min = alive[0].id
+  for (let i = 1; i < alive.length; i++) {
+    if (alive[i].id < min) min = alive[i].id
+  }
+  return min
 }
 
 function App() {
-  // Gameplay config
-  const BOARD_SIZE = 420
-  const RADIUS = 28
-  const VANISH_MS = 2500
+  // Cấu hình
+  const BOARD = 420
+  const R = 28
+  const VANISH_MS = 2000
 
-  // State
-  const [targetCount, setTargetCount] = useState(10)
-  const [circles, setCircles] = useState([]) // {id, x, y}
+  const [target, setTarget] = useState(10)
+  const [circles, setCircles] = useState([])
   const [started, setStarted] = useState(false)
-  const [startTs, setStartTs] = useState(0)
-  const [nowTs, setNowTs] = useState(0)
-  const [finishTs, setFinishTs] = useState(0)
+  const [startAt, setStartAt] = useState(0)
+  const [now, setNow] = useState(0)
+  const [finishAt, setFinishAt] = useState(0)
   const [gameOver, setGameOver] = useState(false)
   const [autoOn, setAutoOn] = useState(false)
-  const [vanishUntil, setVanishUntil] = useState({}) // id -> timestamp when it disappears
+  const [vanishUntil, setVanishUntil] = useState({})
   const [wrongId, setWrongId] = useState(null)
 
-  const timeElapsed = useMemo(() => {
-    if (!started) return 0
-    const end = finishTs || nowTs
-    return Math.max(0, ((end || Date.now()) - startTs) / 1000)
-  }, [started, startTs, nowTs, finishTs])
-
-  // Timer tick
   useEffect(() => {
     if (!started) return
-    const id = setInterval(() => setNowTs(Date.now()), 100)
-    return () => clearInterval(id)
+    const t = setInterval(() => setNow(Date.now()), 100)
+    return () => clearInterval(t)
   }, [started])
 
-  // No auto-start; user must press Play
+  const nextExpected = getNextId(circles, vanishUntil)
 
-  // Convenience: the next expected id is the smallest remaining id
-  const nextExpected = useMemo(() => {
-    if (circles.length === 0) return null
-    const available = circles.filter((c) => !vanishUntil[c.id])
-    if (available.length === 0) return null
-    return available.reduce((min, c) => (c.id < min ? c.id : min), available[0].id)
-  }, [circles, vanishUntil])
-
-  // Start game: create circles and start timer
+  // Start
   const startGame = () => {
-    const count = Math.min(Math.max(Number(targetCount) || 1, 1), 50000)
-    const centers = generateCircles(count, BOARD_SIZE, BOARD_SIZE, RADIUS)
-    const withIds = centers.map((c, idx) => ({ id: idx + 1, ...c }))
-    setCircles(withIds)
-    setStartTs(Date.now())
-  setNowTs(Date.now())
-  setFinishTs(0)
+    const n = Math.min(Math.max(Number(target) || 1, 1), 50000)
+    setCircles(generateCircles(n, BOARD, BOARD, R))
+    const t = Date.now()
+    setStartAt(t)
+    setNow(t)
+    setFinishAt(0)
     setGameOver(false)
-  setVanishUntil({})
+    setVanishUntil({})
     setWrongId(null)
-  setStarted(true)
+    setStarted(true)
   }
 
   // Reset
   const reset = () => {
     setStarted(false)
     setCircles([])
-    setStartTs(0)
-  setNowTs(0)
-  setFinishTs(0)
+    setStartAt(0)
+    setNow(0)
+    setFinishAt(0)
     setGameOver(false)
     setAutoOn(false)
-  setVanishUntil({})
+    setVanishUntil({})
     setWrongId(null)
   }
 
-  // Attempt to click a circle; enforces ascending order
-  const handleCircleClick = (id, fromAuto = false) => {
+  const handleCircleClick = (id) => {
     if (!started || gameOver) return
-    // prevent re-clicking one that is already vanishing
     if (vanishUntil[id]) return
-    if (nextExpected == null) return
-    if (id !== nextExpected) {
+  const expected = getNextId(circles, vanishUntil)
+  if (expected == null) return
+  if (id !== expected) {
       setWrongId(id)
       setGameOver(true)
-      setFinishTs(Date.now())
+      setFinishAt(Date.now())
       return
     }
-    // Animate vanish then remove
     const until = Date.now() + VANISH_MS
-    setVanishUntil((prev) => ({ ...prev, [id]: until }))
-    window.setTimeout(() => {
-      setCircles((prev) => prev.filter((c) => c.id !== id))
-      setVanishUntil((prev) => {
+    setVanishUntil(prev => ({ ...prev, [id]: until }))
+    setTimeout(() => {
+      setCircles(prev => prev.filter(c => c.id !== id))
+      setVanishUntil(prev => {
         const { [id]: _, ...rest } = prev
         return rest
       })
@@ -109,30 +96,29 @@ function App() {
   }
 
   const allCleared = started && !gameOver && circles.length === 0
-
   useEffect(() => {
-    if (started && !gameOver && circles.length === 0 && startTs && !finishTs) {
-      setFinishTs(Date.now())
+    if (started && !gameOver && circles.length === 0 && startAt && !finishAt) {
+      setFinishAt(Date.now())
     }
-  }, [started, gameOver, circles.length, startTs, finishTs])
+  }, [started, gameOver, circles.length, startAt, finishAt])
 
-  // Auto play effect: click the next expected every ~240ms
+  // Auto Play
   useEffect(() => {
-    if (!autoOn || !started || gameOver) return
-    if (circles.length === 0) return
-    const id = window.setTimeout(() => {
-      if (nextExpected != null) handleCircleClick(nextExpected, true)
+    if (!autoOn || !started || gameOver || circles.length === 0) return
+    const t = setTimeout(() => {
+    const nxt = getNextId(circles, vanishUntil)
+    if (nxt != null) handleCircleClick(nxt)
     }, 160)
-    return () => window.clearTimeout(id)
-  }, [autoOn, started, gameOver, circles, nextExpected])
-
-  // Accessibility: prevent accidental Enter-to-start; do nothing
-  const onPointsKeyDown = () => {}
+    return () => clearTimeout(t)
+  }, [autoOn, started, gameOver, circles, vanishUntil])
 
   return (
     <div className="container">
-      <div className="panel">
-        <h2 className="title">{gameOver ? 'GAME OVER' : allCleared ? 'ALL CLEARED' : "LET'S PLAY"}</h2>
+      <div className={`panel ${gameOver ? 'ko' : allCleared ? 'ok' : ''}`}>
+        <h2 className={`title ${gameOver ? 'red' : allCleared ? 'green' : ''}`}>
+          {gameOver ? 'GAME OVER' : allCleared ? 'ALL CLEARED' : "LET'S PLAY"}
+        </h2>
+
         <div className="row">
           <label htmlFor="points">Points:</label>
           <input
@@ -140,22 +126,28 @@ function App() {
             type="number"
             min={1}
             max={50000}
-            value={targetCount}
-            onChange={(e) => setTargetCount(e.target.value)}
-            onKeyDown={onPointsKeyDown}
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            onKeyDown={() => {}}
           />
         </div>
+
         <div className="row">
           <span>Time:</span>
-          <span className="time">{timeElapsed.toFixed(1)}s</span>
+          <span className="time">{(started ? Math.max(0, ((finishAt || now) - startAt) / 1000) : 0).toFixed(1)}s</span>
         </div>
+
         <div className="actions">
           {!started ? (
             <button onClick={startGame} className="primary">Play</button>
           ) : (
             <>
               <button onClick={reset} className="secondary">Reset</button>
-              <button onClick={() => setAutoOn((v) => !v)} className={autoOn ? 'auto on' : 'auto'} disabled={gameOver}>
+              <button
+                onClick={() => setAutoOn(v => !v)}
+                className={autoOn ? 'auto on' : 'auto'}
+                disabled={gameOver}
+              >
                 {autoOn ? 'Auto Play ON' : 'Auto Play OFF'}
               </button>
             </>
@@ -165,37 +157,38 @@ function App() {
 
       <div
         className={`board${autoOn ? ' auto' : ''}`}
-        style={{ width: BOARD_SIZE, height: BOARD_SIZE }}
+        style={{ width: BOARD, height: BOARD }}
         aria-label="Game board"
       >
         {circles.map((c) => {
           const until = vanishUntil[c.id]
-          const remaining = until ? Math.max(0, (until - nowTs) / 1000) : null
+          const remain = until ? Math.max(0, (until - now) / 1000) : null
           return (
-          <button
-            key={c.id}
-            className={
-              'circle' +
-              (until ? ' vanishing' : '') +
-              (wrongId === c.id && gameOver ? ' wrong' : '')
-            }
-            style={{ left: c.x - RADIUS, top: c.y - RADIUS, width: RADIUS * 2, height: RADIUS * 2 }}
-            onClick={() => (!autoOn ? handleCircleClick(c.id) : null)}
-            aria-label={`circle ${c.id}`}
-          >
-            {until ? (
-              <>
+            <button
+              key={c.id}
+              className={
+                'circle' +
+                (until ? ' vanishing' : '') +
+                (wrongId === c.id && gameOver ? ' wrong' : '')
+              }
+              style={{ left: c.x - R, top: c.y - R, width: R * 2, height: R * 2 }}
+              onClick={() => (!autoOn ? handleCircleClick(c.id) : null)}
+              aria-label={`circle ${c.id}`}
+            >
+              {until ? (
+                <>
+                  <span className="num">{c.id}</span>
+                  <span className="remain">{remain.toFixed(1)}s</span>
+                </>
+              ) : (
                 <span className="num">{c.id}</span>
-                <span className="remain">{remaining.toFixed(1)}s</span>
-              </>
-            ) : (
-              <span className="num">{c.id}</span>
-            )}
-          </button>
-        )})}
-
+              )}
+            </button>
+          )
+        })}
       </div>
-  <div className="next-label">Next: {nextExpected ?? '-'}</div>
+
+      <div className="next-label">Next: {nextExpected ?? '-'}</div>
     </div>
   )
 }
