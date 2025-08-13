@@ -1,0 +1,103 @@
+#root {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.25rem;
+  text-align: left;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.panel {
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.row input[type="number"] {
+  width: 80px;
+  padding: 6px 8px;
+}
+
+.actions { display: flex; gap: 8px; margin-top: 8px; }
+
+.actions button { padding: 8px 12px; cursor: pointer; }
+.actions .primary { background: #4caf50; border: 1px solid #43a047; color: white; }
+.actions .secondary { background: #efefef; }
+.actions .auto { background: #fff7e6; border-color: #ffb84d; }
+.actions .auto.on { background: #ffe0b2; border-color: #ff9800; }
+
+.hint { color: #999; font-size: 12px; }
+
+.board {
+  position: relative;
+  border: 2px solid #cfcfcf;
+  border-radius: 6px;
+  background: white;
+  overflow: hidden;
+}
+
+.next-label { grid-column: 2; margin-top: 6px; color: #666; font-size: 13px; }
+
+.circle {
+  position: absolute;
+  border: 2px solid #333;
+  border-radius: 50%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  background: #fff;
+  font-weight: 600;
+  user-select: none;
+  aspect-ratio: 1 / 1; /* ensure perfect circle even if width/height set */
+  transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease, opacity 300ms ease;
+  padding: 0; /* keep number centered */
+  line-height: 1; /* crisp centering */
+}
+
+.circle:hover { background: #ffa72633; border-color: #ff9800; }
+.circle:active { background: #ff9800; color: white; border-color: #ef6c00; transform: scale(0.95); }
+.circle.vanishing { opacity: 0.15; background: #ff98001f; border-color: #ff9800aa; }
+.circle.wrong { background: #ff5252; color: white; border-color: #ff1744; animation: shake 250ms linear both; }
+
+.circle .num { font-size: 16px; line-height: 1; }
+.circle .remain { font-size: 12px; color: #ff9800; line-height: 1; margin-top: 2px; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  color: white;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.cleared { font-size: 28px; letter-spacing: 1px; color: #90ee90; font-weight: 800; }
+.final-time { font-size: 18px; }
+.gameover { font-size: 28px; letter-spacing: 1px; color: #ffb3b3; font-weight: 800; }
