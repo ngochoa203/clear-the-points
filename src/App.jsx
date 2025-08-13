@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
 function generateCircles(count, width, height, radius) {
@@ -38,17 +38,22 @@ function App() {
   const [vanishUntil, setVanishUntil] = useState({})
   const [wrongId, setWrongId] = useState(null)
 
+  const vanishTimers = useRef({})
+
   useEffect(() => {
-    if (!started) return
+    if (!started || gameOver) return
     const t = setInterval(() => setNow(Date.now()), 100)
     return () => clearInterval(t)
-  }, [started])
+  }, [started, gameOver])
 
   const nextExpected = getNextId(circles, vanishUntil)
 
   // Start
   const startGame = () => {
     const n = Math.min(Math.max(Number(target) || 1, 1), 50000)
+
+    for (const k in vanishTimers.current) clearTimeout(vanishTimers.current[k])
+  vanishTimers.current = {}
     setCircles(generateCircles(n, BOARD, BOARD, R))
     const t = Date.now()
     setStartAt(t)
@@ -62,6 +67,8 @@ function App() {
 
   // Reset
   const reset = () => {
+  for (const k in vanishTimers.current) clearTimeout(vanishTimers.current[k])
+  vanishTimers.current = {}
     setStarted(false)
     setCircles([])
     setStartAt(0)
@@ -79,6 +86,8 @@ function App() {
   const expected = getNextId(circles, vanishUntil)
   if (expected == null) return
   if (id !== expected) {
+      for (const k in vanishTimers.current) clearTimeout(vanishTimers.current[k])
+      vanishTimers.current = {}
       setWrongId(id)
       setGameOver(true)
       setFinishAt(Date.now())
@@ -86,13 +95,16 @@ function App() {
     }
     const until = Date.now() + VANISH_MS
     setVanishUntil(prev => ({ ...prev, [id]: until }))
-    setTimeout(() => {
+    const tid = setTimeout(() => {
+      if (vanishTimers.current[id] == null) return
       setCircles(prev => prev.filter(c => c.id !== id))
       setVanishUntil(prev => {
         const { [id]: _, ...rest } = prev
         return rest
       })
+      delete vanishTimers.current[id]
     }, VANISH_MS)
+    vanishTimers.current[id] = tid
   }
 
   const allCleared = started && !gameOver && circles.length === 0
@@ -104,7 +116,7 @@ function App() {
 
   // Auto Play
   useEffect(() => {
-    if (!autoOn || !started || gameOver || circles.length === 0) return
+  if (!autoOn || !started || gameOver || circles.length === 0) return
     const t = setTimeout(() => {
     const nxt = getNextId(circles, vanishUntil)
     if (nxt != null) handleCircleClick(nxt)
@@ -160,9 +172,16 @@ function App() {
         style={{ width: BOARD, height: BOARD }}
         aria-label="Game board"
       >
-        {circles.map((c) => {
+        {[...circles].sort((a, b) => b.id - a.id).map((c) => {
           const until = vanishUntil[c.id]
-          const remain = until ? Math.max(0, (until - now) / 1000) : null
+          let remain
+          if (until) {
+            if (gameOver) {
+              remain = Math.max(0, (until - finishAt) / 1000)
+            } else {
+              remain = Math.max(0, (until - now) / 1000)
+            }
+          }
           return (
             <button
               key={c.id}
@@ -171,7 +190,7 @@ function App() {
                 (until ? ' vanishing' : '') +
                 (wrongId === c.id && gameOver ? ' wrong' : '')
               }
-              style={{ left: c.x - R, top: c.y - R, width: R * 2, height: R * 2 }}
+              style={{ left: c.x - R, top: c.y - R, width: R * 2, height: R * 2, zIndex: 10000 - c.id }}
               onClick={() => (!autoOn ? handleCircleClick(c.id) : null)}
               aria-label={`circle ${c.id}`}
             >
